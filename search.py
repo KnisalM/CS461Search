@@ -25,3 +25,5 @@ def bfs(grid, start, goal):
                 queue.append(neighbor)
 
     return parent
+
+#def dsf(grid, start, goal)
