@@ -27,7 +27,7 @@ def bfs(grid, start, goal):
     return parent
 
 
-def dsf(grid, start, goal):
+def dfs(grid, start, goal):
     if not grid.in_bounds(start) or not grid.is_traversable(start):
         raise ValueError("Start Position is invalid or not traversable")
     if not grid.in_bounds(goal) or not grid.is_traversable(goal):
