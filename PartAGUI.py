@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from collections import deque
 from grid import Grid, CellType
-from search import bfs, dfs
+from search import bfs, dfs, id_dfs
 
 
 class SearchGUI:
@@ -51,7 +51,7 @@ class SearchGUI:
         ttk.Label(control_frame, text="Algorithm:").grid(row=0, column=2, padx=5)
         self.alg_var = tk.StringVar(value="BFS")
         alg_combo = ttk.Combobox(control_frame, textvariable=self.alg_var,
-                                 values=["BFS", "DFS"], width=5)
+                                 values=["BFS", "DFS", "IDDFS"], width=5)
         alg_combo.grid(row=0, column=3, padx=5)
 
         # Obstacle percentage
@@ -293,8 +293,10 @@ class SearchGUI:
         try:
             if algo == "BFS":
                 self.parent = bfs(grid, self.start_pos, self.goal_pos)
-            else:
+            elif algo == "DFS":
                 self.parent = dfs(grid, self.start_pos, self.goal_pos)
+            elif algo == "IDDFS":
+                self.parent = id_dfs(grid, self.start_pos, self.goal_pos)
         except ValueError as e:
             messagebox.showerror("Error", str(e))
             return
