@@ -2,7 +2,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from collections import deque
 from grid import Grid, CellType
-from search import bfs, dfs, id_dfs
+from search import bfs, dfs, id_dfs, greedy_best_first, a_star
 
 
 class SearchGUI:
@@ -51,7 +51,7 @@ class SearchGUI:
         ttk.Label(control_frame, text="Algorithm:").grid(row=0, column=2, padx=5)
         self.alg_var = tk.StringVar(value="BFS")
         alg_combo = ttk.Combobox(control_frame, textvariable=self.alg_var,
-                                 values=["BFS", "DFS", "IDDFS"], width=5)
+                                 values=["BFS", "DFS", "IDDFS", "Greedy Best-First", "A*"], width=5)
         alg_combo.grid(row=0, column=3, padx=5)
 
         # Obstacle percentage
@@ -80,8 +80,19 @@ class SearchGUI:
         self.grid_canvas.pack(side=tk.LEFT, padx=10, pady=10)
 
         # Right: inverted tree canvas
-        self.tree_canvas = tk.Canvas(display_frame, bg="white", width=400, height=400)
-        self.tree_canvas.pack(side=tk.RIGHT, padx=10, pady=10, fill=tk.BOTH, expand=True)
+        tree_frame = ttk.Frame(display_frame)
+        tree_frame.pack(side=tk.RIGHT, padx=10, pady=10, fill=tk.BOTH, expand=True)
+
+        self.tree_canvas = tk.Canvas(tree_frame, bg="white", width=400, height=400)
+        v_scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.tree_canvas.yview)
+        h_scrollbar = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL, command=self.tree_canvas.xview)
+        self.tree_canvas.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
+
+        self.tree_canvas.grid(row=0, column=0, sticky="nsew")
+        v_scrollbar.grid(row=0, column=1, sticky="ns")
+        h_scrollbar.grid(row=1, column=0, sticky="ew")
+        tree_frame.grid_rowconfigure(0, weight=1)
+        tree_frame.grid_columnconfigure(0, weight=1)
 
         # Bind mouse events for grid
         self.grid_canvas.bind("<Motion>", self.on_grid_motion)
@@ -297,6 +308,10 @@ class SearchGUI:
                 self.parent = dfs(grid, self.start_pos, self.goal_pos)
             elif algo == "IDDFS":
                 self.parent = id_dfs(grid, self.start_pos, self.goal_pos)
+            elif algo == "Greedy Best-First":
+                self.parent = greedy_best_first(grid, self.start_pos, self.goal_pos)
+            elif algo == "A*":
+                self.parent = a_star(grid, self.start_pos, self.goal_pos)
         except ValueError as e:
             messagebox.showerror("Error", str(e))
             return
@@ -328,22 +343,30 @@ class SearchGUI:
         start = self.start_pos
         depth = {start: 0}
         queue = deque([start])
-        nodes_in_order = [start]
+        nodes_by_depth = {0: [start]}
         while queue:
             node = queue.popleft()
             for child in children.get(node, []):
                 depth[child] = depth[node] + 1
                 queue.append(child)
-                nodes_in_order.append(child)
+                nodes_by_depth.setdefault(depth[child], []).append(child)
 
-        # Assign x coordinates based on BFS order (simple layout)
-        x_spacing = 40
-        y_spacing = 50
+        max_depth = max(depth.values()) if depth else 0
+
+        # Layout parameters
+        x_spacing = 80
+        y_spacing = 60
+        start_x = 200
+        start_y = 50
+
         positions = {}
-        for idx, node in enumerate(nodes_in_order):
-            x = 50 + idx * x_spacing
-            y = 50 + depth[node] * y_spacing
-            positions[node] = (x, y)
+        for d in range(max_depth + 1):
+            nodes = nodes_by_depth.get(d, [])
+            total = len(nodes)
+            for i, node in enumerate(nodes):
+                x = start_x + (i - (total - 1) / 2) * x_spacing
+                y = start_y + d * y_spacing
+                positions[node] = (x, y)
 
         # Draw edges
         for node, par in parent.items():
@@ -365,6 +388,10 @@ class SearchGUI:
             # Optionally add text with coordinates
             self.tree_canvas.create_text(x, y, text=f"{node[0]},{node[1]}",
                                          font=("Arial", 8))
+
+        bbox = self.tree_canvas.bbox("all")
+        if bbox:
+            self.tree_canvas.configure(scrollregion=bbox)
 
 
 if __name__ == "__main__":

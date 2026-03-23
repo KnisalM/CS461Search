@@ -1,4 +1,5 @@
 from collections import deque
+import heapq
 
 
 def _validate(grid, start, goal):
@@ -79,5 +80,53 @@ def id_dfs(grid, start, goal):
     return parent
 
 
+def manhattan_distance(pos1, pos2):
+    """Define a heuristic helper function that will be utilized for both greedy best first
+    and the A* search functions as the admissible heuristic h(n)"""
+    return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
+
+
 def greedy_best_first(grid, start, goal):
     _validate(grid, start, goal)
+
+    parent = {start: None}
+    visited = {start}
+    # Creating the priority queue heap which will be a min heap with format (heuristic, node)
+    pq = [(manhattan_distance(start, goal), start)]
+    # While loop that continues to loop while PQ is not empty
+    while pq:
+        _, current = heapq.heappop(pq)
+        if current == goal:
+            return parent
+        for neighbor in grid.get_neighbors(current):
+            if neighbor not in visited:
+                visited.add(neighbor)
+                parent[neighbor] = current
+                h = manhattan_distance(start, goal)
+                heapq.heappush(pq, (h, neighbor))
+    return parent
+
+
+def a_star(grid, start, goal):
+    _validate(grid, start, goal)
+
+    parent = {start: None}
+    g_score = {start: 0}
+    f_score = {start: manhattan_distance(start, goal)}
+    # A* search will use a priority queue as well, only difference will be in cost so far
+    pq = [(manhattan_distance(start, goal), start)]
+    while pq:
+        _, current = heapq.heappop(pq)
+        if current == goal:
+            return parent
+        for neighbor in grid.get_neighbors(current):
+            tentative_g = g_score[current] + 1
+            # Next step is taken if this path to neighbor is better than previously found
+            if neighbor not in g_score or tentative_g < g_score[neighbor]:
+                parent[neighbor] = current
+                g_score[neighbor] = tentative_g
+                h = manhattan_distance(neighbor, goal)
+                f = tentative_g + h
+                f_score[neighbor] = f
+                heapq.heappush(pq, (f, neighbor))
+    return parent
