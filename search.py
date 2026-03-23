@@ -54,7 +54,7 @@ def dfs(grid, start, goal):
     return parent
 
 
-def id_dfs(grid, start, goal, ):
+def id_dfs(grid, start, goal):
     _validate(grid, start, goal)
 
     max_depth = grid.size * grid.size
@@ -77,3 +77,7 @@ def id_dfs(grid, start, goal, ):
                         stack.append((neighbor, depth + 1))
 
     return parent
+
+
+def greedy_best_first(grid, start, goal):
+    _validate(grid, start, goal)
