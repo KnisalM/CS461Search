@@ -1,5 +1,9 @@
 from collections import deque
 
+def _validate_helper_function(grid,start,goal):
+    """Extracting the functionality to check if the start and goal locations are in bounds from the functions
+    into a helper function to reduce duplicate code"""
+
 
 def bfs(grid, start, goal):
     if not grid.in_bounds(start) or not grid.is_traversable(start):
@@ -49,3 +53,5 @@ def dfs(grid, start, goal):
                 stack.append(neighbor)
 
     return parent
+
+def id_dfs(grid, start, goal, )
