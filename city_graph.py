@@ -22,4 +22,12 @@ class CityGraph:
 
     def get_max_depth(self):
         return len(self.nodes)
+
+    def add_node(self, name, lat, long):
+        self.nodes[name] = Node(name, lat, long)
+
+    def add_edge(self, city1, city2):
+        # Project defines that each city has symmetric adjacency
+        self.nodes[city1].adjacencies.append(city2)
+        self.nodes[city2].adjacencies.append(city1)
             
