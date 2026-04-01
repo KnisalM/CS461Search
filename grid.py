@@ -99,3 +99,6 @@ class Grid:
         r, c = pos
         cell_type = self.cells[r][c].cell_type
         return cell_type in (CellType.EMPTY, CellType.START, CellType.GOAL)
+
+    def get_max_depth(self):
+        return self.size * self.size

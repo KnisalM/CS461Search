@@ -58,7 +58,7 @@ def dfs(grid, start, goal):
 def id_dfs(grid, start, goal):
     _validate(grid, start, goal)
 
-    max_depth = grid.size * grid.size
+    max_depth = grid.get_max_depth()
 
     for depth_limit in range(max_depth + 1):
         parent = {start: None}
@@ -102,7 +102,7 @@ def greedy_best_first(grid, start, goal):
             if neighbor not in visited:
                 visited.add(neighbor)
                 parent[neighbor] = current
-                h = manhattan_distance(start, goal)
+                h = manhattan_distance(neighbor, goal)
                 heapq.heappush(pq, (h, neighbor))
     return parent
 
