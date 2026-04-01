@@ -1,4 +1,5 @@
 from typing import List, Any
+from math import sqrt
 
 
 class Node:
@@ -10,12 +11,9 @@ class Node:
 
 
 class CityGraph:
-    nodes: List[Node]
 
-    def __init__(self, start, goal):
-        self.nodes = []
-        self.start_city = start
-        self.goal_city = goal
+    def __init__(self):
+        self.nodes = {}
 
     def in_bounds(self, city):
         return city in self.nodes
@@ -37,3 +35,12 @@ class CityGraph:
     def is_traversable(self, city):
         # All cities are traversable, need function name for search algs to continue operating as expected
         return city in self.nodes
+
+    def heuristic_method(self, city_1, city_2):
+        """Defining the heuristic method for this class will require calculating the changes in their coordinate locations
+        While coordinate locations are not the same as locations on a grid, and do not correlate directly to
+        straight line distance, it is an admissible heuristic for the point of this project. This function will work
+        by using the pythagorean theorem and calculating the theoretical straight line coordinate distance"""
+        delta_lat = self.nodes[city_2].latitude - self.nodes[city_1].latitude
+        delta_long = self.nodes[city_2].longitude - self.nodes[city_1].longitude
+        return sqrt((delta_lat**2) + (delta_long**2))
