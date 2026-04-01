@@ -5,9 +5,9 @@ import heapq
 def _validate(grid, start, goal):
     """Extracting the functionality to check if the start and goal locations are in bounds from the functions
     into a helper function to reduce duplicate code"""
-    if not grid.in_bounds(start) or not grid.is_traversable(start):
+    if not grid.is_traversable(start):
         raise ValueError("Start Position is invalid or not traversable")
-    if not grid.in_bounds(goal) or not grid.is_traversable(goal):
+    if not grid.is_traversable(goal):
         raise ValueError("Goal Position is invalid or not traversable")
 
 
@@ -114,7 +114,7 @@ def a_star(grid, start, goal):
         if current == goal:
             return parent
         for neighbor in grid.get_neighbors(current):
-            tentative_g = g_score[current] + 1
+            tentative_g = g_score[current] + grid.get_cost(neighbor, goal)
             # Next step is taken if this path to neighbor is better than previously found
             if neighbor not in g_score or tentative_g < g_score[neighbor]:
                 parent[neighbor] = current

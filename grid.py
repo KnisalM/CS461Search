@@ -107,3 +107,7 @@ class Grid:
         """Define a heuristic helper function that will be utilized for both greedy best first
     and the A* search functions as the admissible heuristic h(n)"""
         return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
+
+    def get_cost(self, cell1, cell2):
+        # unweighted will always return 1
+        return 1

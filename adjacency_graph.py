@@ -1,0 +1,71 @@
+from typing import List, Any
+from math import sqrt
+
+
+class Node:
+    def __init__(self, name, lat, long):
+        self.name = name
+        self.latitude = lat
+        self.longitude = long
+        self.adjacencies = []
+
+
+class AdjacencyGraph:
+
+    def __init__(self):
+        self.nodes = {}
+
+    def in_bounds(self, node):
+        return node in self.nodes
+
+    def get_max_depth(self):
+        return len(self.nodes)
+
+    def add_node(self, name, lat, long):
+        self.nodes[name] = Node(name, lat, long)
+
+    def add_edge(self, node1, node2):
+        # Project defines that each node has symmetric adjacency
+        self.nodes[node1].adjacencies.append(node2)
+        self.nodes[node2].adjacencies.append(node1)
+
+    def get_neighbors(self, node):
+        return self.nodes[node].adjacencies
+
+    def is_traversable(self, node):
+        # All nodes are traversable, need function name for search algs to continue operating as expected
+        return node in self.nodes
+
+    def heuristic_method(self, node_1, node_2):
+        """Defining the heuristic method for this class will require calculating the changes in their coordinate locations
+        While coordinate locations are not the same as locations on a grid, and do not correlate directly to
+        straight line distance, it is an admissible heuristic for the point of this project. This function will work
+        by using the pythagorean theorem and calculating the theoretical straight line coordinate distance"""
+        n1 = self.nodes[node_1]
+        n2 = self.nodes[node_2]
+        delta_lat = n2.latitude - n1.latitude
+        delta_long = n2.longitude - n1.longitude
+        return sqrt((delta_lat**2) + (delta_long**2))
+
+    def load_coordinates(self, filename):
+        # Reads the CSV file and adds nodes to the AdjacencyGraph object
+        with open(filename, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                name, lat, lon = line.split(',')
+                lat = float(lat.strip())
+                lon = float(lon.strip())
+                self.add_node(name.strip(), lat, lon)
+
+    def load_adjacencies(self,filename):
+        # Reads the adjacency file and adds edges to Nodes
+        with open(filename, 'r') as f:
+            for line in f:
+                adjacencies = line.strip().split()
+                if len(adjacencies) == 2:
+                    self.add_edge(adjacencies[0], adjacencies[1])
+
+    def get_cost(self, n1, n2):
+        return self.heuristic_method(n1, n2)
