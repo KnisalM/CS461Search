@@ -17,7 +17,7 @@ class CityGraph:
         self.start_city = start
         self.goal_city = goal
 
-    def valid_city(self, city):
+    def in_bounds(self, city):
         return city in self.nodes
 
     def get_max_depth(self):
@@ -30,4 +30,10 @@ class CityGraph:
         # Project defines that each city has symmetric adjacency
         self.nodes[city1].adjacencies.append(city2)
         self.nodes[city2].adjacencies.append(city1)
-            
+
+    def get_neighbors(self, city):
+        return self.nodes[city].adjacencies
+
+    def is_traversable(self, city):
+        # All cities are traversable, need function name for search algs to continue operating as expected
+        return city in self.nodes
