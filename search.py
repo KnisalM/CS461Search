@@ -64,10 +64,11 @@ def bfs(grid, start, goal, animate=False):
     metrics = tracker.get_metrics(depth, cost, runtime)
     if animate:
         return parent, metrics
-    return parent, metrics
+    else:
+        return parent, metrics
 
 
-def dfs(grid, start, goal):
+def dfs(grid, start, goal, animate=False):
     _validate(grid, start, goal)
     start_time = time.perf_counter()
     tracker = MetricTracker()
@@ -76,9 +77,18 @@ def dfs(grid, start, goal):
     stack = [start]
     tracker.generate(1)
 
+    if animate:
+        frontier_set = set(stack)
+        expanded_set = set()
+
     while stack:
         current = stack.pop()
         gen_count = 0
+
+        if animate:
+            frontier_set.discard(current)
+            expanded_set.add(current)
+            yield current, frontier_set.copy(), expanded_set.copy(), parent.copy()
 
         if current == goal:
             break
@@ -88,6 +98,8 @@ def dfs(grid, start, goal):
                 visited.add(neighbor)
                 parent[neighbor] = current
                 stack.append(neighbor)
+                if animate:
+                    frontier_set.add(neighbor)
                 tracker.generate(1)
                 gen_count += 1
         tracker.expand(len(stack), gen_count)
@@ -108,10 +120,13 @@ def dfs(grid, start, goal):
 
     tracker.branching()
     metrics = tracker.get_metrics(depth, cost, runtime)
-    return parent, metrics
+    if animate:
+        return parent, metrics
+    else:
+        return parent, metrics
 
 
-def id_dfs(grid, start, goal):
+def id_dfs(grid, start, goal, animate=False):
     _validate(grid, start, goal)
     start_time = time.perf_counter()
     tracker = MetricTracker()
@@ -124,9 +139,19 @@ def id_dfs(grid, start, goal):
         # Utilize a stack with format (node, depth)
         stack = [(start, 0)]
 
+        if animate:
+            frontier_set = set(stack)
+            expanded_set = set()
+
         while stack:
             current, depth = stack.pop()
             gen_count = 0
+
+            if animate:
+                frontier_set.discard(current)
+                expanded_set.add(current)
+                yield current, frontier_set.copy(), expanded_set.copy(), parent.copy()
+
             if current == goal:
                 break
             if depth < depth_limit:
@@ -135,6 +160,8 @@ def id_dfs(grid, start, goal):
                         visited.add(neighbor)
                         parent[neighbor] = current
                         stack.append((neighbor, depth + 1))
+                        if animate:
+                            frontier_set.add(neighbor)
                         tracker.generate(1)
                         gen_count += 1
                 tracker.expand(len(stack), gen_count)
@@ -155,10 +182,13 @@ def id_dfs(grid, start, goal):
 
     tracker.branching()
     metrics = tracker.get_metrics(depth, cost, runtime)
-    return parent, metrics
+    if animate:
+        return parent, metrics
+    else:
+        return parent, metrics
 
 
-def greedy_best_first(grid, start, goal):
+def greedy_best_first(grid, start, goal, animate=False):
     _validate(grid, start, goal)
     start_time = time.perf_counter()
     tracker = MetricTracker()
@@ -167,10 +197,21 @@ def greedy_best_first(grid, start, goal):
     # Creating the priority queue heap which will be a min heap with format (heuristic, node)
     pq = [(grid.heuristic_method(start, goal), start)]
     tracker.generate(1)
+
+    if animate:
+        frontier_set = {start}
+        expanded_set = set()
+
     # While loop that continues to loop while PQ is not empty
     while pq:
         _, current = heapq.heappop(pq)
         gen_count = 0
+
+        if animate:
+            frontier_set.discard(current)
+            expanded_set.add(current)
+            yield current, frontier_set.copy(), expanded_set.copy(), parent.copy()
+
         if current == goal:
             break
         for neighbor in grid.get_neighbors(current):
@@ -179,6 +220,8 @@ def greedy_best_first(grid, start, goal):
                 parent[neighbor] = current
                 h = grid.heuristic_method(neighbor, goal)
                 heapq.heappush(pq, (h, neighbor))
+                if animate and neighbor not in frontier_set:
+                    frontier_set.add(neighbor)
                 tracker.generate(1)
                 gen_count += 1
         tracker.expand(len(pq), gen_count)
@@ -198,10 +241,13 @@ def greedy_best_first(grid, start, goal):
 
     tracker.branching()
     metrics = tracker.get_metrics(depth, cost, runtime)
-    return parent, metrics
+    if animate:
+        return parent, metrics
+    else:
+        return parent, metrics
 
 
-def a_star(grid, start, goal):
+def a_star(grid, start, goal, animate=False):
     _validate(grid, start, goal)
     start_time = time.perf_counter()
     tracker = MetricTracker()
@@ -211,9 +257,20 @@ def a_star(grid, start, goal):
     # A* search will use a priority queue as well, only difference will be in cost so far
     pq = [(grid.heuristic_method(start, goal), start)]
     tracker.generate(1)
+
+    if animate:
+        frontier_set = {start}
+        expanded_set = set()
+
     while pq:
         _, current = heapq.heappop(pq)
         gen_count=0
+
+        if animate:
+            frontier_set.discard(current)
+            expanded_set.add(current)
+            yield current, frontier_set.copy(), expanded_set.copy(), parent.copy()
+
         if current == goal:
             break
         for neighbor in grid.get_neighbors(current):
@@ -226,6 +283,8 @@ def a_star(grid, start, goal):
                 f = tentative_g + h
                 f_score[neighbor] = f
                 heapq.heappush(pq, (f, neighbor))
+                if animate and neighbor not in frontier_set:
+                    frontier_set.add(neighbor)
                 tracker.generate(1)
                 gen_count += 1
         tracker.expand(len(pq), gen_count)
@@ -245,7 +304,10 @@ def a_star(grid, start, goal):
 
     tracker.branching()
     metrics = tracker.get_metrics(depth, cost, runtime)
-    return parent, metrics
+    if animate:
+        return parent, metrics
+    else:
+        return parent, metrics
 
 
 class MetricTracker:
