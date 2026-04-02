@@ -13,39 +13,37 @@ class AdjacencyGraphSearchGUI:
 
         # Graph and animation state
         self.graph = None
-        self.node_positions = {}  # name -> (x, y)
-        self.node_circles = {}  # name -> canvas oval id
-        self.node_texts = {}  # name -> canvas text id
-        self.edge_lines = []  # list of (line_id, node1, node2)
+        self.node_positions = {}
+        self.node_circles = {}
+        self.node_texts = {}
+        self.edge_lines = []
         self.start_node = None
         self.goal_node = None
-        self.phase = "start"  # "start", "goal", "done"
+        self.phase = "start"
 
         # Animation state
         self.anim_gen = None
         self.anim_after_id = None
         self.anim_paused = False
-        self.anim_speed = 2.0  # steps per second
+        self.anim_speed = 2.0
         self.current_node = None
         self.frontier_set = set()
         self.expanded_set = set()
         self.anim_parent = {}
         self.final_parent = None
         self.final_metrics = None
-        self.current_grid_config = None  # store (graph, algorithm) for restart
+        self.current_grid_config = None
 
-        # Canvas size (much larger for more space)
+        # Canvas size
         self.canvas_width = 1200
         self.canvas_height = 900
-        self.node_radius = 18  # smaller nodes = less clutter
+        self.node_radius = 18
         self.font_size = 8
 
         # UI elements
         self.create_widgets()
-
         self.canvas.config(width=self.canvas_width, height=self.canvas_height)
 
-        # No graph initially
         self.graph_selection = None
         self.random_n = None
 
@@ -74,14 +72,23 @@ class AdjacencyGraphSearchGUI:
                                  values=["BFS", "DFS", "IDDFS", "Greedy Best-First", "A*"], width=15)
         alg_combo.grid(row=0, column=4, padx=5)
 
+        ttk.Label(control_frame, text="Repeat:").grid(row=0, column=5, padx=5)
+        self.repeat_count = tk.IntVar(value=1)
+        repeat_spin = ttk.Spinbox(control_frame, from_=1, to=5, width=3,
+                                  textvariable=self.repeat_count, state='readonly')
+        repeat_spin.grid(row=0, column=6, padx=5)
+        self.repeat_btn = ttk.Button(control_frame, text="Repeat Search (Avg)",
+                                     command=self.run_repeated_search, state=tk.DISABLED)
+        self.repeat_btn.grid(row=0, column=7, padx=5)
+
         self.start_btn = ttk.Button(control_frame, text="Start Search",
                                     command=self.start_animation, state=tk.DISABLED)
-        self.start_btn.grid(row=0, column=5, padx=10)
+        self.start_btn.grid(row=0, column=8, padx=10)
         self.new_btn = ttk.Button(control_frame, text="New Search", command=self.new_search)
-        self.new_btn.grid(row=0, column=6, padx=5)
+        self.new_btn.grid(row=0, column=9, padx=5)
         self.scatter_btn = ttk.Button(control_frame, text="Scatter Nodes",
                                       command=self.scatter_nodes, state=tk.DISABLED)
-        self.scatter_btn.grid(row=0, column=7, padx=5)
+        self.scatter_btn.grid(row=0, column=10, padx=5)
 
         playback_frame = ttk.Frame(self.root, padding=5)
         playback_frame.pack(side=tk.TOP, fill=tk.X)
@@ -118,7 +125,7 @@ class AdjacencyGraphSearchGUI:
         self.canvas.bind("<Leave>", self.clear_hover)
 
     # ------------------------------------------------------------------
-    # Graph Loading and Drawing
+    # Graph Loading and Drawing (unchanged from your working version)
     # ------------------------------------------------------------------
     def on_graph_selection(self):
         choice = self.graph_var.get()
@@ -146,7 +153,6 @@ class AdjacencyGraphSearchGUI:
                     node1, node2 = parts[0], parts[1]
                     if node1 in self.graph.nodes and node2 in self.graph.nodes:
                         self.graph.add_edge(node1, node2)
-        # Map lat/lon to canvas (full width/height, large margins)
         lats = [node.latitude for node in self.graph.nodes.values()]
         lons = [node.longitude for node in self.graph.nodes.values()]
         if not lats:
@@ -173,7 +179,6 @@ class AdjacencyGraphSearchGUI:
             return
         self.random_n = n
         self.graph = AdjacencyGraph()
-        # Use a grid layout to avoid overlap
         cols = math.ceil(math.sqrt(n))
         rows = math.ceil(n / cols)
         cell_w = (self.canvas_width - 200) / cols
@@ -183,13 +188,11 @@ class AdjacencyGraphSearchGUI:
         positions = {}
         for i in range(n):
             name = str(i + 1)
-            # Random lat/lon within Kansas (for realistic costs)
             min_lat, max_lat = 37.0, 40.0
             min_lon, max_lon = -102.0, -95.0
             lat = random.uniform(min_lat, max_lat)
             lon = random.uniform(min_lon, max_lon)
             self.graph.add_node(name, lat, lon)
-            # Grid position (neat and spaced)
             row = i // cols
             col = i % cols
             x = margin_x + col * cell_w + cell_w / 2
@@ -197,13 +200,11 @@ class AdjacencyGraphSearchGUI:
             positions[name] = (x, y)
         self.node_positions = positions
 
-        # Build spanning tree for connectivity
         nodes = list(positions.keys())
         random.shuffle(nodes)
         for i in range(1, n):
             j = random.randint(0, i - 1)
             self.graph.add_edge(nodes[i], nodes[j])
-        # Add extra random edges
         extra_edges = int(n * 0.2)
         attempts = 0
         while extra_edges > 0 and attempts < 1000:
@@ -218,7 +219,6 @@ class AdjacencyGraphSearchGUI:
         self.scatter_btn.config(state=tk.NORMAL)
 
     def scatter_nodes(self):
-        """Slightly jitter node positions to reduce accidental overlaps."""
         if not self.node_positions:
             return
         margin = self.node_radius + 20
@@ -238,7 +238,6 @@ class AdjacencyGraphSearchGUI:
         self.node_texts.clear()
         self.edge_lines.clear()
         r = self.node_radius
-        # Draw edges
         for name, node in self.graph.nodes.items():
             if name not in self.node_positions:
                 continue
@@ -249,7 +248,6 @@ class AdjacencyGraphSearchGUI:
                 x2, y2 = self.node_positions[neighbor]
                 line_id = self.canvas.create_line(x1, y1, x2, y2, fill="black", width=2)
                 self.edge_lines.append((line_id, name, neighbor))
-        # Draw nodes
         for name, (x, y) in self.node_positions.items():
             fill = "white"
             if name == self.start_node:
@@ -301,13 +299,14 @@ class AdjacencyGraphSearchGUI:
         return path if path and path[0] == self.start_node else []
 
     # ------------------------------------------------------------------
-    # Start/Goal Selection (unchanged)
+    # Start/Goal Selection
     # ------------------------------------------------------------------
     def enable_start_selection(self):
         self.phase = "start"
         self.start_node = None
         self.goal_node = None
         self.start_btn.config(state=tk.DISABLED)
+        self.repeat_btn.config(state=tk.DISABLED)
         self.canvas.bind("<Motion>", self.on_node_motion)
         self.canvas.bind("<Button-1>", self.on_node_click)
 
@@ -351,13 +350,39 @@ class AdjacencyGraphSearchGUI:
                     self.goal_node = name
                     self.phase = "done"
                     self.start_btn.config(state=tk.NORMAL)
+                    self.repeat_btn.config(state=tk.NORMAL)
                     self.draw_graph()
                     return
         self.clear_hover()
 
     # ------------------------------------------------------------------
-    # Animation (unchanged)
+    # Animation (fixed)
     # ------------------------------------------------------------------
+    def _run_silent_search(self, graph, algo, start, goal):
+        """Run search non‑animated and return metrics (for accurate runtime)."""
+        try:
+            if algo == "BFS":
+                gen = bfs(graph, start, goal, animate=False)
+            elif algo == "DFS":
+                gen = dfs(graph, start, goal, animate=False)
+            elif algo == "IDDFS":
+                gen = id_dfs(graph, start, goal, animate=False)
+            elif algo == "Greedy Best-First":
+                gen = greedy_best_first(graph, start, goal, animate=False)
+            elif algo == "A*":
+                gen = a_star(graph, start, goal, animate=False)
+            else:
+                return None
+
+            while True:
+                next(gen)
+        except StopIteration as e:
+            parent, metrics = e.value
+            return metrics
+        except Exception as e:
+            print(f"Silent Search Failed: {e}")
+            return None
+
     def start_animation(self):
         if not self.graph or not self.start_node or not self.goal_node:
             messagebox.showerror("Error", "Please select start and goal nodes.")
@@ -369,6 +394,14 @@ class AdjacencyGraphSearchGUI:
         if not self.current_grid_config:
             return
         graph, algo = self.current_grid_config
+
+        # Run silent search to get accurate metrics (true runtime)
+        silent_metrics = self._run_silent_search(graph, algo, self.start_node, self.goal_node)
+        if silent_metrics is None:
+            # Fallback: metrics will come from generator (but runtime may be wrong)
+            silent_metrics = None
+
+        # Create animated generator
         try:
             if algo == "BFS":
                 gen = bfs(graph, self.start_node, self.goal_node, animate=True)
@@ -386,6 +419,7 @@ class AdjacencyGraphSearchGUI:
             messagebox.showerror("Error", str(e))
             return
 
+        # Reset animation state
         self.anim_gen = gen
         self.anim_paused = False
         self.current_node = None
@@ -393,7 +427,7 @@ class AdjacencyGraphSearchGUI:
         self.expanded_set.clear()
         self.anim_parent.clear()
         self.final_parent = None
-        self.final_metrics = None
+        self.final_metrics = silent_metrics  # will be used at end
         self.play_pause_btn.config(state=tk.NORMAL, text="Pause")
         self.restart_anim_btn.config(state=tk.NORMAL)
         self.start_btn.config(state=tk.DISABLED)
@@ -401,6 +435,7 @@ class AdjacencyGraphSearchGUI:
         if self.anim_after_id:
             self.root.after_cancel(self.anim_after_id)
             self.anim_after_id = None
+
         self._animation_step()
 
     def _animation_step(self):
@@ -416,9 +451,15 @@ class AdjacencyGraphSearchGUI:
             delay_ms = int(1000 / self.anim_speed)
             self.anim_after_id = self.root.after(delay_ms, self._animation_step)
         except StopIteration as e:
-            self.final_parent, self.final_metrics = e.value
+            # Generator finished – extract final parent
+            final_parent, gen_metrics = e.value
+            self.final_parent = final_parent
+            # Use silent metrics if available (accurate runtime), otherwise fallback to generator's
+            if self.final_metrics is None:
+                self.final_metrics = gen_metrics
             self.current_node = None
             self.frontier_set.clear()
+            self.expanded_set.clear()
             self.draw_graph()
             self.display_metrics(self.final_metrics)
             self.play_pause_btn.config(state=tk.DISABLED)
@@ -462,7 +503,7 @@ class AdjacencyGraphSearchGUI:
             return
         for key, value in metrics.items():
             if isinstance(value, float):
-                formatted_value = f"{value:.2f}"
+                formatted_value = f"{value:.8f}"
             else:
                 formatted_value = str(value)
             if key == 'runtime':
@@ -470,9 +511,61 @@ class AdjacencyGraphSearchGUI:
                 display_key = key
             elif key == 'Path Cost':
                 display_key = "Path Cost (km)"
+            elif key == '(averaged over)':
+                display_key = "Averaged over"
             else:
                 display_key = key
             self.metrics_text.insert(tk.END, f"{display_key}: {formatted_value}\n")
+
+    # ------------------------------------------------------------------
+    # Repeat Search (non‑animated, already accurate)
+    # ------------------------------------------------------------------
+    def run_repeated_search(self):
+        if not self.graph or not self.start_node or not self.goal_node:
+            messagebox.showerror("Error", "Please select start and goal nodes first.")
+            return
+        try:
+            n = int(self.repeat_count.get())
+            if n < 1 or n > 5:
+                raise ValueError
+        except:
+            messagebox.showerror("Error", "Repeat count must be between 1 and 5.")
+            return
+
+        algo = self.alg_var.get()
+        metrics_list = []
+        for _ in range(n):
+            try:
+                if algo == "BFS":
+                    gen = bfs(self.graph, self.start_node, self.goal_node, animate=False)
+                elif algo == "DFS":
+                    gen = dfs(self.graph, self.start_node, self.goal_node, animate=False)
+                elif algo == "IDDFS":
+                    gen = id_dfs(self.graph, self.start_node, self.goal_node, animate=False)
+                elif algo == "Greedy Best-First":
+                    gen = greedy_best_first(self.graph, self.start_node, self.goal_node, animate=False)
+                elif algo == "A*":
+                    gen = a_star(self.graph, self.start_node, self.goal_node, animate=False)
+                else:
+                    return
+
+                while True:
+                    next(gen)
+            except StopIteration as e:
+                parent, metrics = e.value
+                metrics_list.append(metrics)
+            except Exception as e:
+                messagebox.showerror("Error", f"Search failed: {e}")
+                return
+        avg_metrics = {}
+        for key in metrics_list[0].keys():
+            values = [m[key] for m in metrics_list]
+            if all(isinstance(v, (int, float)) for v in values):
+                avg_metrics[key] = sum(values) / n
+            else:
+                avg_metrics[key] = values[0]
+        avg_metrics['(Averaged Over)'] = f"{n} runs"
+        self.display_metrics(avg_metrics)
 
     # ------------------------------------------------------------------
     # Reset
@@ -494,6 +587,7 @@ class AdjacencyGraphSearchGUI:
         self.anim_paused = False
         self.current_grid_config = None
         self.start_btn.config(state=tk.DISABLED)
+        self.repeat_btn.config(state=tk.DISABLED)
         self.play_pause_btn.config(state=tk.DISABLED)
         self.restart_anim_btn.config(state=tk.DISABLED)
         self.scatter_btn.config(state=tk.DISABLED)
