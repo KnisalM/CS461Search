@@ -28,7 +28,7 @@ class Cell:
 
 
 class Grid:
-    def __init__(self, size):
+    def __init__(self, size: int):
         self.size = size
         self.cells = [[Cell(i, j) for j in range(size)] for i in range(size)]
         self.start_pos = None

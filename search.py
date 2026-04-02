@@ -132,3 +132,11 @@ class MetricTracker:
         self.nodes_expanded = 0
         self.max_frontier_size = 0
         self.neighbors_generated_per_expansion = []  # List of neighbors generated per expansion, used to calculate branching
+
+    def generate(self, count = 1):
+        self.nodes_generated += count
+
+    def expand(self, frontier: int, neighbors_generated: int):
+        self.nodes_expanded += 1
+        self.max_frontier_size = max(self.max_frontier_size, frontier)
+        self.neighbors_generated_per_expansion.append(neighbors_generated)
