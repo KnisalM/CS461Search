@@ -113,10 +113,13 @@ class Grid:
         return 1
 
     def calculate_path_cost(self, parent, goal):
-        """This function will work for both unweighted grids and adjacency graphs
-        Calculating the cost of the total path. In the unweighted grids, it will simply
-        return the length of the parent"""
+        """Calculate the total cost of the path from start to goal using edge costs."""
         if goal not in parent:
             return float('inf')
-
-        return len(parent)
+        cost = 0
+        current = goal
+        while parent[current] is not None:
+            prev = parent[current]
+            cost += self.get_cost(prev, current)   # get_cost returns 1 for unweighted grid
+            current = prev
+        return cost

@@ -7,37 +7,41 @@ from search import bfs, dfs, id_dfs, greedy_best_first, a_star
 
 class SearchGUI:
     def __init__(self, root):
-        self.new_button = None
-        self.hover_text = None
-        self.hover_rect = None
-        self.cell_texts = None
-        self.cell_rects = None
-        self.tree_canvas = None
-        self.start_button = None
-        self.size_var = None
-        self.alg_var = None
-        self.obstacle_var = None
-        self.grid_canvas = None
         self.root = root
-        self.root.title("Grid Search Visualizer")
+        self.root.title("Grid Search Visualizer - Animated")
 
-        # Default settings
+        # Grid settings
         self.grid_size = 5
-        self.cell_size = 60  # pixels per cell
+        self.cell_size = 60
         self.start_pos = None
         self.goal_pos = None
-        self.phase = "start"  # "start", "goal", "done"
-        self.algorithm = "BFS"
-        self.parent = None
-        self.visited_cells = set()
-        self.obstacles = set()  # store obstacle positions
+        self.phase = "start"          # "start", "goal", "done"
+        self.obstacles = set()
+
+        # Animation state
+        self.anim_gen = None           # generator from search function (animate=True)
+        self.anim_after_id = None
+        self.anim_paused = False
+        self.anim_speed = 2.0          # cells per second (default 2)
+        self.current_node = None       # dark green
+        self.frontier_set = set()      # blue
+        self.expanded_set = set()      # yellow
+        self.anim_parent = {}          # parent dict built during animation
+        self.final_parent = None       # parent dict after search completes
+        self.final_metrics = None      # metrics dict after search completes
+
+        # Store current grid configuration for restart
+        self.current_grid_config = None   # (grid, algorithm_name)
 
         # Build UI
         self.create_widgets()
         self.draw_grid()
 
+    # ------------------------------------------------------------------
+    # UI Creation
+    # ------------------------------------------------------------------
     def create_widgets(self):
-        # Control frame
+        # Control frame (top)
         control_frame = ttk.Frame(self.root, padding=5)
         control_frame.pack(side=tk.TOP, fill=tk.X)
 
@@ -54,68 +58,89 @@ class SearchGUI:
                                  values=["BFS", "DFS", "IDDFS", "Greedy Best-First", "A*"], width=5)
         alg_combo.grid(row=0, column=3, padx=5)
 
-        # Obstacle percentage
         ttk.Label(control_frame, text="Obstacles %:").grid(row=0, column=4, padx=5)
         self.obstacle_var = tk.StringVar(value="20")
         obstacle_entry = ttk.Entry(control_frame, textvariable=self.obstacle_var, width=5)
         obstacle_entry.grid(row=0, column=5, padx=5)
 
-        self.start_button = ttk.Button(control_frame, text="Start Search",
-                                       command=self.start_search, state=tk.DISABLED)
-        self.start_button.grid(row=0, column=6, padx=20)
+        # Start animation button
+        self.start_btn = ttk.Button(control_frame, text="Start Search",
+                                    command=self.start_animation, state=tk.DISABLED)
+        self.start_btn.grid(row=0, column=6, padx=20)
 
-        # New Search button
-        self.new_button = ttk.Button(control_frame, text="New Search",
-                                     command=self.new_search)
-        self.new_button.grid(row=0, column=7, padx=5)
+        # New Search button (resets everything)
+        self.new_btn = ttk.Button(control_frame, text="New Search", command=self.new_search)
+        self.new_btn.grid(row=0, column=7, padx=5)
 
-        # Main display area
-        display_frame = ttk.Frame(self.root)
-        display_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        # Playback controls frame
+        playback_frame = ttk.Frame(self.root, padding=5)
+        playback_frame.pack(side=tk.TOP, fill=tk.X)
 
-        # Left: 2D grid canvas
-        self.grid_canvas = tk.Canvas(display_frame, bg="white",
+        self.play_pause_btn = ttk.Button(playback_frame, text="Pause",
+                                         command=self.toggle_pause, state=tk.DISABLED)
+        self.play_pause_btn.pack(side=tk.LEFT, padx=5)
+
+        self.restart_anim_btn = ttk.Button(playback_frame, text="Restart",
+                                           command=self.restart_animation, state=tk.DISABLED)
+        self.restart_anim_btn.pack(side=tk.LEFT, padx=5)
+
+        ttk.Label(playback_frame, text="Speed (cells/sec):").pack(side=tk.LEFT, padx=(20, 5))
+        self.speed_var = tk.DoubleVar(value=2.0)
+        speed_scale = ttk.Scale(playback_frame, from_=0.5, to=5.0, variable=self.speed_var,
+                                orient=tk.HORIZONTAL, length=150, command=self.on_speed_change)
+        speed_scale.pack(side=tk.LEFT, padx=5)
+        self.speed_label = ttk.Label(playback_frame, text="2.0")
+        self.speed_label.pack(side=tk.LEFT, padx=5)
+
+        # Main display area (left: grid, right: notebook with tree + metrics)
+        main_frame = ttk.Frame(self.root)
+        main_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+
+        # Left: grid canvas
+        self.grid_canvas = tk.Canvas(main_frame, bg="white",
                                      width=self.grid_size * self.cell_size,
                                      height=self.grid_size * self.cell_size)
         self.grid_canvas.pack(side=tk.LEFT, padx=10, pady=10)
 
-        # Right: inverted tree canvas
-        tree_frame = ttk.Frame(display_frame)
-        tree_frame.pack(side=tk.RIGHT, padx=10, pady=10, fill=tk.BOTH, expand=True)
+        # Right: notebook (Tree + Metrics)
+        right_notebook = ttk.Notebook(main_frame)
+        right_notebook.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=10, pady=10)
 
+        # Tree tab
+        tree_frame = ttk.Frame(right_notebook)
+        right_notebook.add(tree_frame, text="Search Tree")
         self.tree_canvas = tk.Canvas(tree_frame, bg="white", width=400, height=400)
-        v_scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.tree_canvas.yview)
-        h_scrollbar = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL, command=self.tree_canvas.xview)
-        self.tree_canvas.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
-
+        v_scroll = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.tree_canvas.yview)
+        h_scroll = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL, command=self.tree_canvas.xview)
+        self.tree_canvas.configure(yscrollcommand=v_scroll.set, xscrollcommand=h_scroll.set)
         self.tree_canvas.grid(row=0, column=0, sticky="nsew")
-        v_scrollbar.grid(row=0, column=1, sticky="ns")
-        h_scrollbar.grid(row=1, column=0, sticky="ew")
+        v_scroll.grid(row=0, column=1, sticky="ns")
+        h_scroll.grid(row=1, column=0, sticky="ew")
         tree_frame.grid_rowconfigure(0, weight=1)
         tree_frame.grid_columnconfigure(0, weight=1)
 
-        # Bind mouse events for grid
+        # Metrics tab
+        metrics_frame = ttk.Frame(right_notebook)
+        right_notebook.add(metrics_frame, text="Metrics")
+        self.metrics_text = tk.Text(metrics_frame, wrap=tk.WORD, height=20, width=40)
+        self.metrics_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+
+        # Bind mouse events for setting start/goal
         self.grid_canvas.bind("<Motion>", self.on_grid_motion)
         self.grid_canvas.bind("<Button-1>", self.on_grid_click)
         self.grid_canvas.bind("<Leave>", self.clear_hover)
 
-        # Store cell rectangles and text items
+        # Store cell references for redrawing
         self.cell_rects = [[None for _ in range(self.grid_size)] for _ in range(self.grid_size)]
         self.cell_texts = [[None for _ in range(self.grid_size)] for _ in range(self.grid_size)]
         self.hover_rect = None
         self.hover_text = None
 
-    def clear_hover(self, event=None):
-        """Remove the temporary hover highlight and text."""
-        if self.hover_rect:
-            self.grid_canvas.delete(self.hover_rect)
-            self.hover_rect = None
-        if self.hover_text:
-            self.grid_canvas.delete(self.hover_text)
-            self.hover_text = None
-
+    # ------------------------------------------------------------------
+    # Grid Drawing with Dynamic Colors (Requirement 4)
+    # ------------------------------------------------------------------
     def draw_grid(self):
-        """Draw the grid based on current size and cell states."""
+        """Redraw the grid with current colors based on animation state."""
         self.grid_canvas.delete("all")
         self.cell_rects = [[None for _ in range(self.grid_size)] for _ in range(self.grid_size)]
         self.cell_texts = [[None for _ in range(self.grid_size)] for _ in range(self.grid_size)]
@@ -128,90 +153,85 @@ class SearchGUI:
                 y2 = y1 + self.cell_size
                 pos = (r, c)
 
-                # Determine fill color based on cell type
-                fill = "white"
+                # Determine fill color
                 if pos == self.start_pos or pos == self.goal_pos:
-                    fill = "black"
+                    fill = "black"  # start/goal cells remain black (text overlay will show)
                 elif pos in self.obstacles:
                     fill = "red"
-                elif pos in self.visited_cells:
-                    fill = "lightblue"
+                elif pos == self.current_node:
+                    fill = "dark green"  # Requirement 3
+                elif pos in self.frontier_set:
+                    fill = "blue"  # frontier
+                elif pos in self.expanded_set:
+                    fill = "yellow"  # expanded
+                elif self.final_parent and self.goal_pos in self.final_parent:
+                    # Show final path in light green after search completes
+                    path = self.reconstruct_path(self.final_parent)
+                    if pos in path and pos not in (self.start_pos, self.goal_pos):
+                        fill = "light green"
+                    else:
+                        fill = "white"
+                else:
+                    fill = "white"  # unexplored
 
-                rect = self.grid_canvas.create_rectangle(x1, y1, x2, y2,
-                                                         fill=fill, outline="gray")
+                rect = self.grid_canvas.create_rectangle(x1, y1, x2, y2, fill=fill, outline="gray")
                 self.cell_rects[r][c] = rect
 
                 # Draw X for obstacles
                 if pos in self.obstacles:
-                    # Draw black X
                     self.grid_canvas.create_line(x1, y1, x2, y2, fill="black", width=2)
                     self.grid_canvas.create_line(x1, y2, x2, y1, fill="black", width=2)
 
                 # Draw text for start/goal
                 if pos == self.start_pos:
-                    text = self.grid_canvas.create_text(x1 + self.cell_size // 2,
-                                                        y1 + self.cell_size // 2,
-                                                        text="Start", fill="red",
-                                                        font=("Arial", 10, "bold"))
-                    self.cell_texts[r][c] = text
+                    self.grid_canvas.create_text(x1 + self.cell_size // 2, y1 + self.cell_size // 2,
+                                                 text="Start", fill="red", font=("Arial", 10, "bold"))
                 elif pos == self.goal_pos:
-                    text = self.grid_canvas.create_text(x1 + self.cell_size // 2,
-                                                        y1 + self.cell_size // 2,
-                                                        text="Goal", fill="green",
-                                                        font=("Arial", 10, "bold"))
-                    self.cell_texts[r][c] = text
+                    self.grid_canvas.create_text(x1 + self.cell_size // 2, y1 + self.cell_size // 2,
+                                                 text="Goal", fill="green", font=("Arial", 10, "bold"))
 
-        # Draw path if available (as a thick border)
-        if self.parent and self.goal_pos in self.parent:
-            path = self.reconstruct_path()
-            for (r, c) in path:
-                if (r, c) != self.start_pos and (r, c) != self.goal_pos and (r, c) not in self.obstacles:
-                    x1 = c * self.cell_size
-                    y1 = r * self.cell_size
-                    x2 = x1 + self.cell_size
-                    y2 = y1 + self.cell_size
-                    self.grid_canvas.create_rectangle(x1, y1, x2, y2,
-                                                      outline="yellow", width=3)
-
-    def reconstruct_path(self):
-        """Reconstruct path from start to goal using parent dict."""
+    def reconstruct_path(self, parent):
+        """Reconstruct path from start to goal using given parent dict."""
+        if not parent or self.goal_pos not in parent:
+            return []
         path = []
-        current = self.goal_pos
-        while current is not None:
-            path.append(current)
-            current = self.parent.get(current)
+        cur = self.goal_pos
+        while cur is not None:
+            path.append(cur)
+            cur = parent.get(cur)
         path.reverse()
         return path if path and path[0] == self.start_pos else []
 
+    # ------------------------------------------------------------------
+    # Mouse Handlers for Setting Start/Goal
+    # ------------------------------------------------------------------
+    def clear_hover(self, event=None):
+        if self.hover_rect:
+            self.grid_canvas.delete(self.hover_rect)
+            self.hover_rect = None
+        if self.hover_text:
+            self.grid_canvas.delete(self.hover_text)
+            self.hover_text = None
+
     def on_grid_motion(self, event):
-        """Handle mouse motion: highlight cell if in correct phase."""
         if self.phase not in ("start", "goal"):
             return
-
         col = event.x // self.cell_size
         row = event.y // self.cell_size
         if not (0 <= row < self.grid_size and 0 <= col < self.grid_size):
             self.clear_hover()
             return
-
         pos = (row, col)
-        # Don't highlight if it's already start/goal or an obstacle (though obstacles aren't set until search)
         if pos == self.start_pos or pos == self.goal_pos:
             self.clear_hover()
             return
-
-        # Remove previous hover highlight
         self.clear_hover()
-
-        # Draw temporary black rectangle
         x1 = col * self.cell_size
         y1 = row * self.cell_size
         x2 = x1 + self.cell_size
         y2 = y1 + self.cell_size
         self.hover_rect = self.grid_canvas.create_rectangle(x1, y1, x2, y2,
                                                             fill="black", outline="gray")
-
-        # Show text based on phase
         text = "Start" if self.phase == "start" else "Goal"
         color = "red" if self.phase == "start" else "green"
         self.hover_text = self.grid_canvas.create_text(x1 + self.cell_size // 2,
@@ -220,126 +240,190 @@ class SearchGUI:
                                                        font=("Arial", 10, "bold"))
 
     def on_grid_click(self, event):
-        """Handle click to set start or goal."""
         col = event.x // self.cell_size
         row = event.y // self.cell_size
         if not (0 <= row < self.grid_size and 0 <= col < self.grid_size):
             return
-
         pos = (row, col)
-
         if self.phase == "start" and pos != self.goal_pos:
-            # Set start
             self.start_pos = pos
             self.phase = "goal"
             self.draw_grid()
         elif self.phase == "goal" and pos != self.start_pos:
-            # Set goal
             self.goal_pos = pos
             self.phase = "done"
-            self.start_button.config(state=tk.NORMAL)
+            self.start_btn.config(state=tk.NORMAL)
             self.draw_grid()
-
-        # Remove hover highlight after click
         self.clear_hover()
 
-    def on_size_change(self, event):
-        """Change grid size and reset state."""
-        new_size = int(self.size_var.get())
-        self.grid_size = new_size
-        self.start_pos = None
-        self.goal_pos = None
-        self.phase = "start"
-        self.parent = None
-        self.visited_cells.clear()
-        self.obstacles.clear()
-        self.start_button.config(state=tk.DISABLED)
-
-        # Resize canvas
-        self.grid_canvas.config(width=self.grid_size * self.cell_size,
-                                height=self.grid_size * self.cell_size)
-        self.draw_grid()
-        self.tree_canvas.delete("all")
-
-    def new_search(self):
-        """Reset everything for a new search without changing grid size."""
-        self.start_pos = None
-        self.goal_pos = None
-        self.phase = "start"
-        self.parent = None
-        self.visited_cells.clear()
-        self.obstacles.clear()
-        self.start_button.config(state=tk.DISABLED)
-        self.draw_grid()
-        self.tree_canvas.delete("all")
-        self.clear_hover()
-
-    def start_search(self):
-        """Run selected search algorithm and visualize results."""
-        # Create grid object
+    # ------------------------------------------------------------------
+    # Animation Control (Requirements 2,3,5,6,7)
+    # ------------------------------------------------------------------
+    def start_animation(self):
+        """Create generator and begin animation."""
+        # Build grid with obstacles
         grid = Grid(self.grid_size)
         grid.set_start(self.start_pos)
         grid.set_goal(self.goal_pos)
-
-        # Set obstacles using user-provided percentage
         try:
-            obstacle_pct = float(self.obstacle_var.get())
-            if obstacle_pct < 0 or obstacle_pct > 100:
+            pct = float(self.obstacle_var.get())
+            if not 0 <= pct <= 100:
                 raise ValueError
-            grid.set_obstacles(obstacle_pct / 100.0)
+            grid.set_obstacles(pct / 100.0)
         except ValueError:
-            messagebox.showerror("Error", "Obstacle percentage must be a number between 0 and 100")
+            messagebox.showerror("Error", "Obstacle percentage must be between 0 and 100")
             return
 
-        # Store obstacle positions for display
+        # Record obstacles for display
         self.obstacles.clear()
         for r in range(self.grid_size):
             for c in range(self.grid_size):
-                cell = grid.get_cell((r, c))
-                if cell.cell_type == CellType.OBSTACLE:
+                if grid.get_cell((r, c)).cell_type == CellType.OBSTACLE:
                     self.obstacles.add((r, c))
 
-        # Run search
-        algo = self.alg_var.get()
+        # Store the grid configuration for restart
+        self.current_grid_config = (grid, self.alg_var.get())
+
+        # Create the generator using the stored config
+        self._create_animation_generator()
+
+    def _create_animation_generator(self):
+        """Create a new generator from the stored grid configuration."""
+        if not self.current_grid_config:
+            return
+        grid, algo = self.current_grid_config
+
         try:
             if algo == "BFS":
-                self.parent = bfs(grid, self.start_pos, self.goal_pos)
+                gen = bfs(grid, self.start_pos, self.goal_pos, animate=True)
             elif algo == "DFS":
-                self.parent = dfs(grid, self.start_pos, self.goal_pos)
+                gen = dfs(grid, self.start_pos, self.goal_pos, animate=True)
             elif algo == "IDDFS":
-                self.parent = id_dfs(grid, self.start_pos, self.goal_pos)
+                gen = id_dfs(grid, self.start_pos, self.goal_pos, animate=True)
             elif algo == "Greedy Best-First":
-                self.parent = greedy_best_first(grid, self.start_pos, self.goal_pos)
+                gen = greedy_best_first(grid, self.start_pos, self.goal_pos, animate=True)
             elif algo == "A*":
-                self.parent = a_star(grid, self.start_pos, self.goal_pos)
+                gen = a_star(grid, self.start_pos, self.goal_pos, animate=True)
+            else:
+                return
         except ValueError as e:
             messagebox.showerror("Error", str(e))
             return
 
-        # Collect visited cells (all keys in parent plus start)
-        self.visited_cells = set(self.parent.keys())
-        self.visited_cells.add(self.start_pos)
+        # Reset animation state
+        self.anim_gen = gen
+        self.anim_paused = False
+        self.current_node = None
+        self.frontier_set.clear()
+        self.expanded_set.clear()
+        self.anim_parent.clear()
+        self.final_parent = None
+        self.final_metrics = None
+        self.play_pause_btn.config(state=tk.NORMAL, text="Pause")
+        self.restart_anim_btn.config(state=tk.NORMAL)
+        self.start_btn.config(state=tk.DISABLED)
+        self.phase = "done"  # prevent further start/goal changes during animation
 
-        # Update grid display
-        self.draw_grid()
+        # Cancel any pending after call
+        if self.anim_after_id:
+            self.root.after_cancel(self.anim_after_id)
+            self.anim_after_id = None
 
-        # Draw inverted tree
-        self.draw_tree(self.parent)
+        # Start stepping
+        self._animation_step()
 
-    def draw_tree(self, parent):
-        """Draw inverted tree on the right canvas."""
-        self.tree_canvas.delete("all")
-
-        if not parent:
+    def _animation_step(self):
+        """Advance one step in the generator and schedule next step."""
+        if self.anim_paused:
             return
 
-        # Build children mapping
+        try:
+            # Get next state from generator
+            current, frontier, expanded, parent = next(self.anim_gen)
+            # Update animation state
+            self.current_node = current
+            self.frontier_set = frontier
+            self.expanded_set = expanded
+            self.anim_parent = parent
+            # Redraw grid to show changes
+            self.draw_grid()
+            # Schedule next step based on current speed
+            delay_ms = int(1000 / self.anim_speed)
+            self.anim_after_id = self.root.after(delay_ms, self._animation_step)
+        except StopIteration as e:
+            # Generator finished – extract final parent and metrics
+            self.final_parent, self.final_metrics = e.value
+            self.current_node = None
+            self.frontier_set.clear()
+            self.expanded_set.clear()
+            # Draw final path (light green) and tree
+            self.draw_grid()
+            self.draw_tree(self.final_parent)
+            self.display_metrics(self.final_metrics)  # Requirement 8
+            # Disable playback buttons, enable New Search / Start again
+            self.play_pause_btn.config(state=tk.DISABLED)
+            self.restart_anim_btn.config(state=tk.DISABLED)
+            self.start_btn.config(state=tk.NORMAL)
+            self.anim_gen = None
+            self.anim_after_id = None
+
+    def toggle_pause(self):
+        """Pause or resume animation (Requirement 6)."""
+        if self.anim_gen is None:
+            return
+        self.anim_paused = not self.anim_paused
+        self.play_pause_btn.config(text="Play" if self.anim_paused else "Pause")
+        if self.anim_paused:
+            # Cancel any pending after call
+            if self.anim_after_id:
+                self.root.after_cancel(self.anim_after_id)
+                self.anim_after_id = None
+        else:
+            # Resume: schedule next step if generator not finished
+            if self.anim_after_id is None and self.anim_gen is not None:
+                self._animation_step()
+
+    def restart_animation(self):
+        """Restart the current search visualization from the beginning (Requirement 5)."""
+        if self.anim_gen is None and not self.current_grid_config:
+            return
+        # Cancel current after call
+        if self.anim_after_id:
+            self.root.after_cancel(self.anim_after_id)
+            self.anim_after_id = None
+        # Recreate generator using the stored grid configuration (same obstacles)
+        self._create_animation_generator()
+
+    def on_speed_change(self, event=None):
+        """Update animation speed from slider (Requirement 7)."""
+        self.anim_speed = self.speed_var.get()
+        self.speed_label.config(text=f"{self.anim_speed:.1f}")
+        # The next step will automatically use the new delay
+
+    # ------------------------------------------------------------------
+    # Metrics Display (Requirement 8)
+    # ------------------------------------------------------------------
+    def display_metrics(self, metrics):
+        """Show metrics dictionary in the Metrics tab."""
+        self.metrics_text.delete(1.0, tk.END)
+        if not metrics:
+            self.metrics_text.insert(tk.END, "No metrics available.")
+            return
+        for key, value in metrics.items():
+            self.metrics_text.insert(tk.END, f"{key}: {value}\n")
+
+    # ------------------------------------------------------------------
+    # Tree Drawing (after search completes)
+    # ------------------------------------------------------------------
+    def draw_tree(self, parent):
+        """Draw inverted tree on the right canvas (same as original)."""
+        self.tree_canvas.delete("all")
+        if not parent:
+            return
         children = {}
         for node, par in parent.items():
             if par is not None:
                 children.setdefault(par, []).append(node)
-
-        # BFS to get all nodes and depths
         start = self.start_pos
         depth = {start: 0}
         queue = deque([start])
@@ -350,15 +434,11 @@ class SearchGUI:
                 depth[child] = depth[node] + 1
                 queue.append(child)
                 nodes_by_depth.setdefault(depth[child], []).append(child)
-
         max_depth = max(depth.values()) if depth else 0
-
-        # Layout parameters
         x_spacing = 80
         y_spacing = 60
         start_x = 200
         start_y = 50
-
         positions = {}
         for d in range(max_depth + 1):
             nodes = nodes_by_depth.get(d, [])
@@ -367,17 +447,12 @@ class SearchGUI:
                 x = start_x + (i - (total - 1) / 2) * x_spacing
                 y = start_y + d * y_spacing
                 positions[node] = (x, y)
-
-        # Draw edges
         for node, par in parent.items():
             if par is not None:
                 x1, y1 = positions[par]
                 x2, y2 = positions[node]
                 self.tree_canvas.create_line(x1, y1, x2, y2, fill="black")
-
-        # Draw nodes
         for node, (x, y) in positions.items():
-            # Color: start=red, goal=green, others=lightblue
             if node == self.start_pos:
                 color = "red"
             elif node == self.goal_pos:
@@ -385,13 +460,47 @@ class SearchGUI:
             else:
                 color = "lightblue"
             self.tree_canvas.create_oval(x - 10, y - 10, x + 10, y + 10, fill=color, outline="black")
-            # Optionally add text with coordinates
-            self.tree_canvas.create_text(x, y, text=f"{node[0]},{node[1]}",
-                                         font=("Arial", 8))
-
+            self.tree_canvas.create_text(x, y, text=f"{node[0]},{node[1]}", font=("Arial", 8))
         bbox = self.tree_canvas.bbox("all")
         if bbox:
             self.tree_canvas.configure(scrollregion=bbox)
+
+    # ------------------------------------------------------------------
+    # Reset Functions (New Search, Size Change)
+    # ------------------------------------------------------------------
+    def new_search(self):
+        """Reset everything for a new search (Requirement 5 also covered)."""
+        # Cancel any running animation
+        if self.anim_after_id:
+            self.root.after_cancel(self.anim_after_id)
+            self.anim_after_id = None
+        self.start_pos = None
+        self.goal_pos = None
+        self.phase = "start"
+        self.obstacles.clear()
+        self.current_node = None
+        self.frontier_set.clear()
+        self.expanded_set.clear()
+        self.anim_parent.clear()
+        self.final_parent = None
+        self.final_metrics = None
+        self.anim_gen = None
+        self.anim_paused = False
+        self.current_grid_config = None   # clear stored config
+        self.start_btn.config(state=tk.DISABLED)
+        self.play_pause_btn.config(state=tk.DISABLED)
+        self.restart_anim_btn.config(state=tk.DISABLED)
+        self.metrics_text.delete(1.0, tk.END)
+        self.tree_canvas.delete("all")
+        self.draw_grid()
+
+    def on_size_change(self, event):
+        """Change grid size and reset everything."""
+        self.new_search()  # reuse reset logic
+        self.grid_size = int(self.size_var.get())
+        self.grid_canvas.config(width=self.grid_size * self.cell_size,
+                                height=self.grid_size * self.cell_size)
+        self.draw_grid()
 
 
 if __name__ == "__main__":
