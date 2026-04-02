@@ -124,3 +124,11 @@ def a_star(grid, start, goal):
                 f_score[neighbor] = f
                 heapq.heappush(pq, (f, neighbor))
     return parent
+
+
+class MetricTracker:
+    def __init__(self):
+        self.nodes_generated = 0
+        self.nodes_expanded = 0
+        self.max_frontier_size = 0
+        self.neighbors_generated_per_expansion = []  # List of neighbors generated per expansion, used to calculate branching
