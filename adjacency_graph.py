@@ -2,6 +2,12 @@ from typing import List, Any
 from math import sqrt
 
 
+def haversine_covnersion(lat1, lat2, lon1, lon2):
+    """Adding the haversine conversion, currently my Path Cost for the adjacency graph is returning
+    Change in degrees, not any actual useable distance, need this to be in a unit that is readable and understandable"""
+    R = 6371.0  # This is earth's approximate radius in Kilometers
+
+
 class Node:
     def __init__(self, name, lat, long):
         self.name = name
@@ -45,7 +51,7 @@ class AdjacencyGraph:
         n2 = self.nodes[node_2]
         delta_lat = n2.latitude - n1.latitude
         delta_long = n2.longitude - n1.longitude
-        return sqrt((delta_lat**2) + (delta_long**2))
+        return sqrt((delta_lat ** 2) + (delta_long ** 2))
 
     def load_coordinates(self, filename):
         # Reads the CSV file and adds nodes to the AdjacencyGraph object
@@ -59,7 +65,7 @@ class AdjacencyGraph:
                 lon = float(lon.strip())
                 self.add_node(name.strip(), lat, lon)
 
-    def load_adjacencies(self,filename):
+    def load_adjacencies(self, filename):
         # Reads the adjacency file and adds edges to Nodes
         with open(filename, 'r') as f:
             for line in f:
