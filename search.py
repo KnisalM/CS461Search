@@ -150,3 +150,21 @@ class MetricTracker:
         else:
             self.average_branching = 0
             self.max_branching = 0
+
+    def get_metrics(self, depth, cost, runtime):
+        """To calculate cost within the metric tracker, it would need to have cross access to the grid or adjacencygraph objects
+        Since this cross referencing could cause issues, we will instead pass depth, cost, and runtime from the search algorithm
+        """
+        return {
+            'runtime': runtime,
+            'Peak Frontier Size': self.max_frontier_size,
+            'Nodes Generated': self.nodes_generated,
+            'Nodes Expanded': self.nodes_expanded,
+            'Average Branching Factor': self.average_branching
+            'Max Branching Factor': self.max_branching,
+            'Solution Depth': depth,
+            'Path Cost': cost
+        }
+
+
+        }
