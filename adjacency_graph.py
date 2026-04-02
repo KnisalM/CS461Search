@@ -94,3 +94,16 @@ class AdjacencyGraph:
             total_cost += self.get_cost(prev, current)
             current = prev
         return total_cost
+
+    def deep_copy(self):
+        # Return a deep copy of the adjacency graph item so that they can be stored for batch processing
+        new_graph = AdjacencyGraph()
+        # make copies of all Nodes
+        for name, node in self.nodes.items():
+            new_graph.add_node(name, node.latitude, node.longitude)
+        # Copy all the edges
+        for name, node in self.nodes.items():
+            for neighbor in node.adjacencies:
+                if name < neighbor:
+                    new_graph.add_edge(name, neighbor)
+        return new_graph
