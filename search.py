@@ -132,6 +132,8 @@ class MetricTracker:
         self.nodes_expanded = 0
         self.max_frontier_size = 0
         self.neighbors_generated_per_expansion = []  # List of neighbors generated per expansion, used to calculate branching
+        self.average_branching = 0
+        self.max_branching = 0
 
     def generate(self, count = 1):
         self.nodes_generated += count
@@ -140,3 +142,11 @@ class MetricTracker:
         self.nodes_expanded += 1
         self.max_frontier_size = max(self.max_frontier_size, frontier)
         self.neighbors_generated_per_expansion.append(neighbors_generated)
+
+    def branching(self):
+        if self.neighbors_generated_per_expansion:
+            self.average_branching = (sum(self.neighbors_generated_per_expansion) / len(self.neighbors_generated_per_expansion))
+            self.max_branching = max(self.neighbors_generated_per_expansion)
+        else:
+            self.average_branching = 0
+            self.max_branching = 0
