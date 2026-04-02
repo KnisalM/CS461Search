@@ -14,7 +14,7 @@ class Launcher:
 
         ttk.Button(root, text="2D Grid Search w/animation", width=25, command=self.launch_2d).pack(pady=10)
         ttk.Button(root, text="Single Search Adjacency Graph", width=25, command=self.launch_single).pack(pady=10)
-        # ttk.Button(root, text="Batch Mode (Compare Searches)", width=25, command=self.launch_batch).pack(pady=10)
+        ttk.Button(root, text="Batch Mode (Compare Searches)", width=25, command=self.launch_batch).pack(pady=10)
 
     def launch_2d(self):
         self.root.destroy()
@@ -32,13 +32,13 @@ class Launcher:
         app = AdjacencyGraphSearchGUI(new_root)
         new_root.mainloop()
 
-    """def launch_batch(self):
+    def launch_batch(self):
         self.root.destroy()
         # Import batch mode GUI (not yet designed)
         from BatchGraphSearch import BatchGraphSearchGUI
         new_root = tk.Tk()
         app = BatchGraphSearchGUI(new_root)
-        new_root.mainloop()"""
+        new_root.mainloop()
 
 if __name__ == "__main__":
     root = tk.Tk()
