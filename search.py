@@ -136,23 +136,21 @@ def id_dfs(grid, start, goal, animate=False):
     for depth_limit in range(max_depth + 1):
         parent = {start: None}
         visited = {start}
-        # Utilize a stack with format (node, depth)
         stack = [(start, 0)]
-
         if animate:
-            frontier_set = set(stack)
+            frontier_set = {start}
             expanded_set = set()
+        found = False
 
-        while stack:
+        while stack and not found:
             current, depth = stack.pop()
             gen_count = 0
-
             if animate:
                 frontier_set.discard(current)
                 expanded_set.add(current)
                 yield current, frontier_set.copy(), expanded_set.copy(), parent.copy()
-
             if current == goal:
+                found = True
                 break
             if depth < depth_limit:
                 for neighbor in grid.get_neighbors(current):
@@ -165,17 +163,19 @@ def id_dfs(grid, start, goal, animate=False):
                         tracker.generate(1)
                         gen_count += 1
                 tracker.expand(len(stack), gen_count)
+        if found:
+            break   # exit the for loop
 
     runtime = time.perf_counter() - start_time
 
-    # compute depth and cost of search, doing within search algorithms because otherwise MetricTracker needs access to grid/adjacency graph classes, no need for that access
+    # compute depth and cost (same as original)
     if goal in parent:
         depth = 0
         node = goal
         while parent[node] is not None:
             depth += 1
             node = parent[node]
-        cost = grid.calculate_path_cost(parent,goal)
+        cost = grid.calculate_path_cost(parent, goal)
     else:
         depth = -1
         cost = float('inf')
