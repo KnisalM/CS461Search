@@ -69,3 +69,19 @@ class AdjacencyGraph:
 
     def get_cost(self, n1, n2):
         return self.heuristic_method(n1, n2)
+
+    def calculate_path_cost(self, parent, goal):
+        """This function will work for both unweighted grids and adjacency graphs
+        Calculating the cost of the total path. In the weighted grid, this will use the get_cost
+        function which calculates node to node cost, and then it will sum each traversal and
+        return total path cost"""
+        if goal not in parent:
+            return float('inf')
+
+        total_cost = 0.0
+        current = goal
+        while parent[current] is not None:
+            prev = parent[current]
+            total_cost += self.get_cost(prev, current)
+            current = prev
+        return total_cost
